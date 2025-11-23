@@ -36,31 +36,45 @@ const App: React.FC = () => {
 
   // Initialize checks
   useEffect(() => {
-    // 1. Check for Admin Route
-    if (window.location.pathname === '/admin') {
-        setAppState(AppState.ADMIN);
-        return;
-    }
-
-    // 2. Check for Shared Result
-    const params = new URLSearchParams(window.location.search);
-    const shareData = params.get('share');
-    
-    if (shareData) {
-      try {
-        const jsonString = decodeURIComponent(escape(window.atob(shareData)));
-        const parsedAnalysis = JSON.parse(jsonString) as VoiceAnalysisResult;
+    const checkRoute = () => {
+        // Support Path (if server rewrite exists) OR Hash (static safe)
+        // This fixes 'Cannot GET /admin' on static hosts by allowing /#/admin
+        const isPathAdmin = window.location.pathname === '/admin';
+        const isHashAdmin = window.location.hash === '#/admin' || window.location.hash === '#admin';
         
-        if (parsedAnalysis.overallScore && parsedAnalysis.metrics) {
-            setAnalysis(parsedAnalysis);
-            setAppState(AppState.RESULT);
+        if (isPathAdmin || isHashAdmin) {
+            setAppState(AppState.ADMIN);
+            return true;
         }
-      } catch (e) {
-        console.error("Failed to parse shared result", e);
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    }
-  }, []);
+
+        // Check for Shared Result via Query Param
+        const params = new URLSearchParams(window.location.search);
+        const shareData = params.get('share');
+        
+        if (shareData && appState === AppState.IDLE) {
+          try {
+            const jsonString = decodeURIComponent(escape(window.atob(shareData)));
+            const parsedAnalysis = JSON.parse(jsonString) as VoiceAnalysisResult;
+            
+            if (parsedAnalysis.overallScore && parsedAnalysis.metrics) {
+                setAnalysis(parsedAnalysis);
+                setAppState(AppState.RESULT);
+            }
+          } catch (e) {
+            console.error("Failed to parse shared result", e);
+            window.history.replaceState(null, '', '/');
+          }
+        }
+        return false;
+    };
+
+    // Check on mount
+    checkRoute();
+
+    // Listen for hash changes (e.g. user manually changes URL to #/admin)
+    window.addEventListener('hashchange', checkRoute);
+    return () => window.removeEventListener('hashchange', checkRoute);
+  }, [appState]);
 
   // Start Recording
   const startRecording = async () => {
@@ -137,10 +151,11 @@ const App: React.FC = () => {
   };
 
   const resetApp = () => {
-    // If we were in admin, go back to root
-    if (appState === AppState.ADMIN) {
+    // Clean URL
+    if (window.location.hash.includes('admin') || window.location.pathname.includes('admin')) {
         window.history.pushState({}, '', '/');
     } else {
+        // Remove query params if any
         window.history.pushState({}, '', window.location.pathname);
     }
     
@@ -158,7 +173,9 @@ const App: React.FC = () => {
     try {
       const jsonString = JSON.stringify(analysis);
       const encodedData = window.btoa(unescape(encodeURIComponent(jsonString)));
-      const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encodedData}`;
+      // Use clean URL for sharing
+      const baseUrl = window.location.origin + window.location.pathname;
+      const shareUrl = `${baseUrl}?share=${encodedData}`;
       
       navigator.clipboard.writeText(shareUrl).then(() => {
         setIsCopied(true);
@@ -167,6 +184,11 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Failed to generate share link", e);
     }
+  };
+
+  // Secret shortcut to admin
+  const handleSecretAdmin = () => {
+      window.location.hash = '#/admin';
   };
 
   if (appState === AppState.ADMIN) {
@@ -185,7 +207,11 @@ const App: React.FC = () => {
                     </div>
                     <span className="font-semibold tracking-tight">Voice<span className="text-zinc-400">Analytics</span></span>
                 </div>
-                <div className="text-xs font-mono text-zinc-500 flex items-center gap-2">
+                <div 
+                    className="text-xs font-mono text-zinc-500 flex items-center gap-2 cursor-pointer select-none"
+                    onDoubleClick={handleSecretAdmin}
+                    title="System Status: Normal"
+                >
                     <span className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse"></span>
                     SYSTEM ONLINE
                 </div>
@@ -446,7 +472,7 @@ const App: React.FC = () => {
             )}
         </main>
         
-        {/* Footer - No Admin Button */}
+        {/* Footer */}
         <footer className="w-full py-6 text-center text-zinc-800 text-xs">
             © 2024 VoiceAnalytics AI
         </footer>
