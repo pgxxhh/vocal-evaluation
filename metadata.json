@@ -1,0 +1,7 @@
+{
+  "name": "Vocal Vibe Check",
+  "description": "AI-powered voice analysis tool that scores your voice, classifies your archetype, and provides a witty, spicy commentary.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
