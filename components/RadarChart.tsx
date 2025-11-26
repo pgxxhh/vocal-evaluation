@@ -1,18 +1,28 @@
+
 import React from 'react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, Tooltip } from 'recharts';
-import { VoiceMetrics } from '../types';
+import { VoiceMetrics, Language } from '../types';
 
 interface VoiceRadarProps {
   metrics: VoiceMetrics;
+  language: Language;
 }
 
-const VoiceRadar: React.FC<VoiceRadarProps> = ({ metrics }) => {
+const VoiceRadar: React.FC<VoiceRadarProps> = ({ metrics, language }) => {
+  
+  const labels = {
+    en: { clarity: 'Clarity', charisma: 'Charisma', uniqueness: 'Uniqueness', stability: 'Stability', warmth: 'Warmth' },
+    zh: { clarity: '清晰度', charisma: '魅力值', uniqueness: '独特性', stability: '稳定性', warmth: '温暖度' }
+  };
+
+  const l = labels[language];
+
   const data = [
-    { subject: 'Clarity', A: metrics.clarity, fullMark: 100 },
-    { subject: 'Charisma', A: metrics.charisma, fullMark: 100 },
-    { subject: 'Uniqueness', A: metrics.uniqueness, fullMark: 100 },
-    { subject: 'Stability', A: metrics.stability, fullMark: 100 },
-    { subject: 'Warmth', A: metrics.warmth, fullMark: 100 },
+    { subject: l.clarity, A: metrics.clarity, fullMark: 100 },
+    { subject: l.charisma, A: metrics.charisma, fullMark: 100 },
+    { subject: l.uniqueness, A: metrics.uniqueness, fullMark: 100 },
+    { subject: l.stability, A: metrics.stability, fullMark: 100 },
+    { subject: l.warmth, A: metrics.warmth, fullMark: 100 },
   ];
 
   return (
@@ -43,7 +53,7 @@ const VoiceRadar: React.FC<VoiceRadarProps> = ({ metrics }) => {
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}
             itemStyle={{ color: '#06b6d4' }}
-            formatter={(value: number) => [`${value}/100`, 'Score']}
+            formatter={(value: number) => [`${value}/100`, language === 'zh' ? '得分' : 'Score']}
           />
         </RadarChart>
       </ResponsiveContainer>

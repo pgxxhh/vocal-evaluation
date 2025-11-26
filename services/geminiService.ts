@@ -1,8 +1,6 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { VoiceAnalysisResult } from "../types";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { VoiceAnalysisResult, Language } from "../types";
 
 const responseSchema: Schema = {
   type: Type.OBJECT,
@@ -13,33 +11,37 @@ const responseSchema: Schema = {
     },
     voiceArchetype: {
       type: Type.STRING,
-      description: "A creative but accurate professional classification (e.g., 'The Late Night DJ', 'The Corporate Leader').",
+      description: "A creative but accurate professional classification.",
     },
     estimatedAge: {
       type: Type.STRING,
-      description: "Estimate the speaker's biological age based on vocal maturity, timbre and pitch (e.g., 'Late 20s', 'Approx 35', 'Teenager').",
+      description: "Estimate the speaker's biological age based on vocal maturity.",
     },
     estimatedWeight: {
       type: Type.STRING,
-      description: "Estimate the speaker's body weight/build based on vocal resonance, lung capacity and fullness (e.g., 'Approx 70kg', 'Light build ~50kg', 'Heavy build >90kg').",
+      description: "Estimate the speaker's body weight/build based on vocal resonance.",
+    },
+    isPinched: {
+      type: Type.BOOLEAN,
+      description: "Strictly identify 'Pinched Voice' (夹子音/Jiazi Yin). Return TRUE ONLY if the voice exhibits artificial constriction, forced nasality, and raised larynx intended to sound 'cute'. Return FALSE for naturally high-pitched, sweet, or soft voices that sound relaxed.",
     },
     roast: {
       type: Type.STRING,
-      description: "A sharp, witty, and potentially 'savage' commentary. If the voice sounds fake, forced (e.g., '夹子音' / forced cuteness), or pretentious, roast them hard. Use Gen Z humor.",
+      description: "A sharp, witty, and potentially 'savage' commentary.",
     },
     encouragement: {
       type: Type.STRING,
-      description: "A separate, distinct paragraph of genuine support. If the score is low, reassure them that the roast was a joke and highlight their potential. If high, give a brief high-five.",
+      description: "A separate, distinct paragraph of genuine support.",
     },
     pros: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "Top 3 technical or aesthetic strengths (objective).",
+      description: "Top 3 technical or aesthetic strengths.",
     },
     cons: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "Top 3 areas for improvement (objective).",
+      description: "Top 3 areas for improvement.",
     },
     similarVoice: {
       type: Type.STRING,
@@ -66,32 +68,59 @@ const responseSchema: Schema = {
       required: ["pitchRange", "speakingPace", "expressiveness"],
     },
   },
-  required: ["overallScore", "voiceArchetype", "estimatedAge", "estimatedWeight", "roast", "encouragement", "pros", "cons", "similarVoice", "metrics", "technical"],
+  required: ["overallScore", "voiceArchetype", "estimatedAge", "estimatedWeight", "isPinched", "roast", "encouragement", "pros", "cons", "similarVoice", "metrics", "technical"],
 };
 
-export const analyzeVoice = async (audioBlob: Blob): Promise<VoiceAnalysisResult> => {
+export const analyzeVoice = async (audioBlob: Blob, language: Language = 'zh'): Promise<VoiceAnalysisResult> => {
   try {
     const base64Data = await blobToBase64(audioBlob);
+    
+    // Initialize Gemini Client inside the function to ensure process.env is ready
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = "gemini-2.5-flash"; 
     
+    // Dynamic instructions based on language selection
+    const langInstructions = language === 'zh' 
+        ? `OUTPUT LANGUAGE: SIMPLIFIED CHINESE (简体中文).
+           All text fields MUST be in Chinese.
+           For 'roast': Use spicy Chinese internet slang.
+           For 'isPinched': CRITICAL - Accurately distinguish between 'Natural Sweet Voice' (False) and 'Deliberate Jiazi' (True).`
+        : `OUTPUT LANGUAGE: ENGLISH.
+           All text fields MUST be in English.
+           For 'isPinched': Detect if the voice sounds forced, pinched, or artificially high-pitched (like a cartoon character).`;
+
     const prompt = `
-      You are an expert Audio Engineer and a 'Vibe Check' specialist. Analyze the user voice recording.
+      You are an expert Voice Coach and Audio Engineer. Analyze the user voice recording.
       
-      IMPORTANT: The user may speak in ANY language or dialect (English, Chinese, Spanish, etc.).
-      Do not bias the score based on the language spoken. If you cannot understand the words, you must still analyze the **sound** itself.
+      IMPORTANT: The user may speak in ANY language or dialect. Analyze the **sound physics** (timbre, resonance, glottal tension).
       
+      ${langInstructions}
+
+      **STRICT RULE FOR 'PINCHED VOICE' (夹子音 - isPinched) DETECTION:**
+      You must differentiate between a **Natural High Voice** and a **Forced Pinched Voice**.
+      
+      1. **Set isPinched = TRUE (Detected) IF AND ONLY IF:**
+         - **Constriction:** The speaker sounds like they are tightening their throat/pharynx.
+         - **Raised Larynx:** The sound is artificially thin, bright, and lacks chest resonance.
+         - **Performative:** The intonation is exaggeratedly "cute" (anime-style), often with nasal endings or forced breathiness.
+         - **Inconsistency:** You hear effort or strain to maintain the pitch.
+      
+      2. **Set isPinched = FALSE (Natural) IF:**
+         - **Relaxed Phonation:** The high pitch sounds open, free, and comfortable.
+         - **Resonance:** There is natural body/warmth in the voice, even if it is high-pitched.
+         - **Authenticity:** The speaker sounds like this is their biological default.
+      
+      *Do not flag someone as 'Pinched' just because they have a sweet or high voice. It must sound FORCED.*
+
       Part 1: Rigorous Objective Analysis.
-      Analyze the **acoustic properties** (timbre, resonance, pitch stability, clarity of tone) like a scientist.
-      Identify technical strengths and weaknesses regardless of language. Score strictly based on how the voice *sounds*.
-      **Infer Demographics**: 
-      1. Age: Listen to vocal maturity/roughness.
-      2. Weight: Estimate physical build/weight based on vocal tract resonance and fullness.
+      - **Acoustic Properties**: Timbre, resonance, pitch stability.
+      - **Demographics**: Estimate Age and Weight/Build based on vocal tract resonance.
       
-      Part 2: The Verdict (Two Parts).
-      1. **The Roast**: Be honest and sharp. If they sound like they are forcing a voice (e.g., '夹子音' / forced cuteness, Batman voice, fake radio host), CALL THEM OUT. Be funny, spicy, and use internet slang.
+      Part 2: The Verdict.
+      1. **The Roast**: Be honest and sharp. If isPinched=true, mock the "Jiazi" attempt mercilessly. If natural, roast their speaking style or content.
       2. **The Encouragement**: 
-         - If Overall Score < 60: "Look, I was roasting you for fun. Your voice actually has [X quality]. Don't be afraid to speak up."
-         - If Overall Score > 80: "Jokes aside, you have a killer voice. Keep using it."
+         - If Overall Score < 60: Reassure them.
+         - If Overall Score > 80: Give a brief high-five.
 
       Output valid JSON matching the schema.
     `;
@@ -107,7 +136,7 @@ export const analyzeVoice = async (audioBlob: Blob): Promise<VoiceAnalysisResult
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        temperature: 0.8, // Slightly higher for more creative roasts
+        temperature: 0.7, // Slightly lower temperature for more consistent classification
       },
     });
 
@@ -127,8 +156,12 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result as string;
-      const base64 = result.split(',')[1];
-      resolve(base64);
+      if (result) {
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      } else {
+        reject(new Error("Failed to convert blob to base64"));
+      }
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);

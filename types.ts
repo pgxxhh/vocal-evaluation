@@ -1,3 +1,4 @@
+
 export enum AppState {
   IDLE = 'IDLE',
   RECORDING = 'RECORDING',
@@ -6,6 +7,8 @@ export enum AppState {
   ERROR = 'ERROR',
   ADMIN = 'ADMIN' 
 }
+
+export type Language = 'en' | 'zh';
 
 export interface VoiceMetrics {
   clarity: number;
@@ -33,6 +36,7 @@ export interface VoiceAnalysisResult {
   similarVoice: string; 
   metrics: VoiceMetrics; 
   technical: TechnicalDetails;
+  isPinched?: boolean; // New field for "Jiazi Yin" detection
 }
 
 export interface VoiceRecord {

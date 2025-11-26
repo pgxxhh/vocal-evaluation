@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { AppState, VoiceAnalysisResult } from './types';
+import { AppState, VoiceAnalysisResult, Language } from './types';
 import Visualizer from './components/Visualizer';
 import VoiceRadar from './components/RadarChart';
 import AdminDashboard from './components/AdminDashboard';
@@ -19,10 +20,90 @@ import {
   Zap,
   HeartHandshake,
   Globe,
+  Languages,
+  AlertTriangle
 } from 'lucide-react';
+
+const translations = {
+  en: {
+    title: "Voice Analytics",
+    systemOnline: "SYSTEM ONLINE",
+    heroTitle: "Discover Your Vocal Signature",
+    heroDesc: "Advanced AI analysis of your clarity, charisma, and tone. Receive detailed acoustic metrics and personalized feedback.",
+    globalHint: "Supports any language or dialect. We analyze the sound, not the words.",
+    tapToRecord: "Tap to Initialize Recording",
+    recording: "Recording",
+    speakNaturally: "Speak naturally. Read a sentence or introduce yourself.",
+    stopAnalysis: "Stop Analysis",
+    processingTitle: "Processing Acoustics",
+    processingDesc: "Generating spectral analysis and profiling...",
+    metricsTitle: "Acoustic Metrics",
+    objective: "OBJECTIVE",
+    score: "Score",
+    vocalAge: "Vocal Age",
+    estWeight: "Est. Weight",
+    pitchRange: "Pitch Range",
+    pacing: "Pacing",
+    expressiveness: "Expressiveness",
+    isPinchedLabel: "Pinched Voice",
+    pinchedDetected: "Detected (Artificial)",
+    naturalVoice: "Natural / Authentic",
+    similarVoice: "Similar Voice",
+    dimAnalysis: "Dimensional Analysis",
+    strengths: "Key Strengths",
+    growth: "Areas for Growth",
+    archetype: "Voice Archetype",
+    roast: "The Roast",
+    realityCheck: "Reality Check",
+    newAnalysis: "New Analysis",
+    shareResults: "Share Results",
+    copied: "Copied Link!",
+    tryAgain: "Try Again",
+    errorMic: "Microphone access denied. Please check permissions.",
+    errorAnalysis: "Analysis failed. Please try again."
+  },
+  zh: {
+    title: "声音分析",
+    systemOnline: "系统在线",
+    heroTitle: "探索你的声音特质",
+    heroDesc: "AI 深度分析你的音色、魅力与独特性。获取详细的声学指标和个性化建议。",
+    globalHint: "支持任何语言或方言。我们需要听到的是你的“声音”。",
+    tapToRecord: "点击开始录音",
+    recording: "正在录音",
+    speakNaturally: "请自然说话。读一句话，或者做个自我介绍。",
+    stopAnalysis: "停止并分析",
+    processingTitle: "正在分析声学特征",
+    processingDesc: "生成频谱报告与声音画像中...",
+    metricsTitle: "声学指标",
+    objective: "客观数据",
+    score: "综合评分",
+    vocalAge: "声音年龄",
+    estWeight: "预估体格",
+    pitchRange: "音域范围",
+    pacing: "语速节奏",
+    expressiveness: "表现力",
+    isPinchedLabel: "夹子音鉴定",
+    pinchedDetected: "⚠️ 疑似夹子音",
+    naturalVoice: "✅ 自然原声",
+    similarVoice: "相似声音",
+    dimAnalysis: "维度分析",
+    strengths: "核心优势",
+    growth: "提升空间",
+    archetype: "声音原型",
+    roast: "毒舌点评",
+    realityCheck: "真实建议",
+    newAnalysis: "重新测试",
+    shareResults: "分享结果",
+    copied: "链接已复制!",
+    tryAgain: "重试",
+    errorMic: "麦克风访问被拒绝，请检查权限。",
+    errorAnalysis: "分析失败，请重试。"
+  }
+};
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
+  const [language, setLanguage] = useState<Language>('zh');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [analysis, setAnalysis] = useState<VoiceAnalysisResult | null>(null);
@@ -34,11 +115,12 @@ const App: React.FC = () => {
   const chunksRef = useRef<BlobPart[]>([]);
   const timerIntervalRef = useRef<number | null>(null);
 
+  const t = translations[language];
+
   // Initialize checks
   useEffect(() => {
     const checkRoute = () => {
         // Support Path (if server rewrite exists) OR Hash (static safe)
-        // This fixes 'Cannot GET /admin' on static hosts by allowing /#/admin
         const isPathAdmin = window.location.pathname === '/admin';
         const isHashAdmin = window.location.hash === '#/admin' || window.location.hash === '#admin';
         
@@ -71,10 +153,14 @@ const App: React.FC = () => {
     // Check on mount
     checkRoute();
 
-    // Listen for hash changes (e.g. user manually changes URL to #/admin)
+    // Listen for hash changes
     window.addEventListener('hashchange', checkRoute);
     return () => window.removeEventListener('hashchange', checkRoute);
   }, [appState]);
+
+  const toggleLanguage = () => {
+    setLanguage(prev => prev === 'en' ? 'zh' : 'en');
+  };
 
   // Start Recording
   const startRecording = async () => {
@@ -114,7 +200,7 @@ const App: React.FC = () => {
 
     } catch (err) {
       console.error(err);
-      setErrorMsg("Microphone access denied. Please check permissions.");
+      setErrorMsg(t.errorMic);
       setAppState(AppState.ERROR);
     }
   };
@@ -136,7 +222,7 @@ const App: React.FC = () => {
   // Handle Gemini API Call
   const handleAnalysis = async (blob: Blob) => {
     try {
-      const result = await analyzeVoice(blob);
+      const result = await analyzeVoice(blob, language);
       setAnalysis(result);
       
       // Save access log (no audio)
@@ -145,7 +231,7 @@ const App: React.FC = () => {
       setAppState(AppState.RESULT);
     } catch (err) {
       console.error(err);
-      setErrorMsg("Analysis failed. Please try again.");
+      setErrorMsg(t.errorAnalysis);
       setAppState(AppState.ERROR);
     }
   };
@@ -205,15 +291,26 @@ const App: React.FC = () => {
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
                         <Activity className="w-5 h-5 text-white" />
                     </div>
-                    <span className="font-semibold tracking-tight">Voice<span className="text-zinc-400">Analytics</span></span>
+                    <span className="font-semibold tracking-tight hidden sm:inline">Voice<span className="text-zinc-400">Analytics</span></span>
                 </div>
-                <div 
-                    className="text-xs font-mono text-zinc-500 flex items-center gap-2 cursor-pointer select-none"
-                    onDoubleClick={handleSecretAdmin}
-                    title="System Status: Normal"
-                >
-                    <span className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse"></span>
-                    SYSTEM ONLINE
+                
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={toggleLanguage}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors border border-white/5 text-xs font-medium text-zinc-300"
+                    >
+                        <Languages className="w-3.5 h-3.5" />
+                        {language === 'zh' ? '中文 / EN' : 'EN / 中文'}
+                    </button>
+
+                    <div 
+                        className="text-xs font-mono text-zinc-500 flex items-center gap-2 cursor-pointer select-none"
+                        onDoubleClick={handleSecretAdmin}
+                        title="System Status: Normal"
+                    >
+                        <span className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse"></span>
+                        <span className="hidden sm:inline">{t.systemOnline}</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -229,7 +326,7 @@ const App: React.FC = () => {
                         onClick={resetApp}
                         className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-2 rounded-full font-medium transition-all"
                     >
-                        Try Again
+                        {t.tryAgain}
                     </button>
                 </div>
             )}
@@ -239,18 +336,17 @@ const App: React.FC = () => {
                 <div className="text-center space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
                     <div className="space-y-4">
                         <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-400">
-                            Discover Your Vocal Signature
+                            {t.heroTitle}
                         </h1>
                         <p className="text-zinc-400 max-w-lg mx-auto text-lg leading-relaxed">
-                            Advanced AI analysis of your clarity, charisma, and tone. 
-                            Receive detailed acoustic metrics and personalized feedback.
+                            {t.heroDesc}
                         </p>
                         
                         {/* Language/Global Support Hint */}
                         <div className="flex items-center justify-center gap-2 max-w-md mx-auto py-2 px-4 rounded-full bg-white/5 border border-white/5">
                             <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
                             <span className="text-xs text-zinc-400">
-                                Supports <strong>any language or dialect</strong>. We analyze the <em>sound</em>, not the words.
+                                {t.globalHint}
                             </span>
                         </div>
                     </div>
@@ -266,7 +362,7 @@ const App: React.FC = () => {
                     </div>
                     
                     <div className="text-xs font-mono text-zinc-600 uppercase tracking-widest">
-                        Tap to Initialize Recording
+                        {t.tapToRecord}
                     </div>
                 </div>
             )}
@@ -279,14 +375,14 @@ const App: React.FC = () => {
                         <div className="flex justify-between items-center mb-8">
                             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
                                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                <span className="text-xs font-medium text-red-400 uppercase tracking-wider">Recording</span>
+                                <span className="text-xs font-medium text-red-400 uppercase tracking-wider">{t.recording}</span>
                             </div>
                             <span className="font-mono text-2xl font-medium tabular-nums">{timer < 10 ? `0${timer}` : timer}s / 15s</span>
                         </div>
                         
                         <Visualizer stream={stream} isRecording={true} />
                         
-                        <p className="text-center text-zinc-500 text-sm mt-8">Speak naturally. Read a sentence or introduce yourself.</p>
+                        <p className="text-center text-zinc-500 text-sm mt-8">{t.speakNaturally}</p>
                     </div>
                     
                     <button 
@@ -294,7 +390,7 @@ const App: React.FC = () => {
                         className="w-full py-4 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-lg transition-colors flex items-center justify-center gap-3 shadow-lg"
                     >
                         <Square className="w-5 h-5 fill-current" />
-                        Stop Analysis
+                        {t.stopAnalysis}
                     </button>
                 </div>
             )}
@@ -307,8 +403,8 @@ const App: React.FC = () => {
                         <div className="absolute inset-0 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
                      </div>
                      <div className="space-y-2">
-                        <h3 className="text-xl font-medium text-white">Processing Acoustics</h3>
-                        <p className="text-zinc-500 text-sm">Generating spectral analysis and profiling...</p>
+                        <h3 className="text-xl font-medium text-white">{t.processingTitle}</h3>
+                        <p className="text-zinc-500 text-sm">{t.processingDesc}</p>
                      </div>
                 </div>
             )}
@@ -321,9 +417,9 @@ const App: React.FC = () => {
                     <section className="glass-panel rounded-3xl p-1 overflow-hidden">
                         <div className="bg-zinc-900/50 px-6 py-4 border-b border-white/5 flex justify-between items-center">
                             <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                <BarChart3 className="w-4 h-4" /> Acoustic Metrics
+                                <BarChart3 className="w-4 h-4" /> {t.metricsTitle}
                             </h2>
-                            <span className="text-xs font-mono text-cyan-500 bg-cyan-950/30 px-2 py-1 rounded">OBJECTIVE</span>
+                            <span className="text-xs font-mono text-cyan-500 bg-cyan-950/30 px-2 py-1 rounded">{t.objective}</span>
                         </div>
                         
                         <div className="p-6">
@@ -344,23 +440,32 @@ const App: React.FC = () => {
                                     </svg>
                                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                                         <span className="text-3xl font-bold">{analysis.overallScore}</span>
-                                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Score</span>
+                                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{t.score}</span>
                                     </div>
                                 </div>
 
                                 {/* Tech Stats */}
                                 <div className="grid grid-cols-2 gap-4 w-full">
                                      {[
-                                        { label: "Vocal Age", val: analysis.estimatedAge },
-                                        { label: "Est. Weight", val: analysis.estimatedWeight },
-                                        { label: "Pitch Range", val: analysis.technical.pitchRange },
-                                        { label: "Pacing", val: analysis.technical.speakingPace },
-                                        { label: "Expressiveness", val: analysis.technical.expressiveness },
-                                        { label: "Similar Voice", val: analysis.similarVoice }
+                                        { label: t.vocalAge, val: analysis.estimatedAge },
+                                        { label: t.estWeight, val: analysis.estimatedWeight },
+                                        { label: t.pitchRange, val: analysis.technical.pitchRange },
+                                        { label: t.pacing, val: analysis.technical.speakingPace },
+                                        { label: t.expressiveness, val: analysis.technical.expressiveness },
+                                        { 
+                                            label: t.isPinchedLabel, 
+                                            val: analysis.isPinched ? t.pinchedDetected : t.naturalVoice,
+                                            highlight: analysis.isPinched,
+                                            icon: analysis.isPinched ? AlertTriangle : CheckCircle2
+                                        },
+                                        { label: t.similarVoice, val: analysis.similarVoice, span: true }
                                     ].map((item, i) => (
-                                        <div key={i} className={`bg-zinc-800/50 rounded-lg p-3 border border-white/5 ${i === 5 ? 'col-span-2' : ''}`}>
-                                            <div className="text-[10px] text-zinc-500 uppercase mb-1">{item.label}</div>
-                                            <div className="text-sm font-medium text-zinc-200">{item.val}</div>
+                                        <div key={i} className={`bg-zinc-800/50 rounded-lg p-3 border border-white/5 ${item.span ? 'col-span-2' : ''} ${item.highlight ? 'bg-amber-900/10 border-amber-500/20' : ''}`}>
+                                            <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase mb-1">
+                                                {item.icon && <item.icon className={`w-3 h-3 ${item.highlight ? 'text-amber-500' : 'text-emerald-500'}`} />}
+                                                {item.label}
+                                            </div>
+                                            <div className={`text-sm font-medium ${item.highlight ? 'text-amber-400' : 'text-zinc-200'}`}>{item.val}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -369,13 +474,13 @@ const App: React.FC = () => {
                             {/* Radar & Pros/Cons Split */}
                             <div className="grid md:grid-cols-2 gap-8 border-t border-white/5 pt-8">
                                 <div>
-                                    <h3 className="text-xs font-semibold text-zinc-500 mb-4 uppercase">Dimensional Analysis</h3>
-                                    <VoiceRadar metrics={analysis.metrics} />
+                                    <h3 className="text-xs font-semibold text-zinc-500 mb-4 uppercase">{t.dimAnalysis}</h3>
+                                    {analysis.metrics && <VoiceRadar metrics={analysis.metrics} language={language} />}
                                 </div>
                                 <div className="space-y-6">
                                     <div>
                                         <h3 className="text-xs font-semibold text-emerald-500 mb-3 uppercase flex items-center gap-2">
-                                            <CheckCircle2 className="w-3 h-3" /> Key Strengths
+                                            <CheckCircle2 className="w-3 h-3" /> {t.strengths}
                                         </h3>
                                         <ul className="space-y-2">
                                             {analysis.pros.map((pro, i) => (
@@ -388,7 +493,7 @@ const App: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="text-xs font-semibold text-orange-500 mb-3 uppercase flex items-center gap-2">
-                                            <XCircle className="w-3 h-3" /> Areas for Growth
+                                            <XCircle className="w-3 h-3" /> {t.growth}
                                         </h3>
                                         <ul className="space-y-2">
                                             {analysis.cons.map((con, i) => (
@@ -416,7 +521,7 @@ const App: React.FC = () => {
                                     <Fingerprint className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Voice Archetype</div>
+                                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">{t.archetype}</div>
                                     <h2 className="text-2xl font-bold text-white tracking-tight">{analysis.voiceArchetype}</h2>
                                 </div>
                             </div>
@@ -425,7 +530,7 @@ const App: React.FC = () => {
                             <div className="bg-zinc-800/30 rounded-2xl p-6 border border-white/5 relative">
                                 <div className="flex items-center gap-2 mb-3 text-purple-400">
                                     <Zap className="w-4 h-4 fill-current" />
-                                    <span className="text-xs font-bold uppercase tracking-wide">The Roast</span>
+                                    <span className="text-xs font-bold uppercase tracking-wide">{t.roast}</span>
                                 </div>
                                 <p className="text-zinc-200 leading-relaxed text-lg italic font-medium">
                                     "{analysis.roast}"
@@ -436,7 +541,7 @@ const App: React.FC = () => {
                             <div className="pl-2 border-l-2 border-emerald-500/30">
                                 <div className="flex items-center gap-2 mb-2 text-emerald-500">
                                     <HeartHandshake className="w-4 h-4" />
-                                    <span className="text-xs font-bold uppercase tracking-wide">Reality Check</span>
+                                    <span className="text-xs font-bold uppercase tracking-wide">{t.realityCheck}</span>
                                 </div>
                                 <p className="text-zinc-400 text-sm leading-relaxed">
                                     {analysis.encouragement}
@@ -451,7 +556,7 @@ const App: React.FC = () => {
                             onClick={resetApp}
                             className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
                         >
-                            <RefreshCw className="w-4 h-4" /> New Analysis
+                            <RefreshCw className="w-4 h-4" /> {t.newAnalysis}
                         </button>
                         <button 
                             onClick={handleShare}
@@ -459,11 +564,11 @@ const App: React.FC = () => {
                         >
                             {isCopied ? (
                                 <>
-                                    <Check className="w-4 h-4" /> Copied Link!
+                                    <Check className="w-4 h-4" /> {t.copied}
                                 </>
                             ) : (
                                 <>
-                                    <LinkIcon className="w-4 h-4" /> Share Results
+                                    <LinkIcon className="w-4 h-4" /> {t.shareResults}
                                 </>
                             )}
                         </button>
